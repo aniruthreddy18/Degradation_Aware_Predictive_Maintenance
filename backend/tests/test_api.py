@@ -50,7 +50,7 @@ def test_predict_matches_cached_fleet_prediction(client):
     r = client.post("/api/predict", json={"readings": rows})
     assert r.status_code == 200
     out = r.json()
-    assert abs(out["rul"] - d["engine"]["predRul"]) < 0.3 and out["risk"] == d["engine"]["risk"]
+    assert abs(out["rul"] - d["engine"]["predRul"]) < 0.11 and out["risk"] == d["engine"]["risk"]
 
 
 def test_predict_validation(client):
@@ -74,3 +74,11 @@ def test_api_key_enforced(client, monkeypatch):
     rows = [{s: d["sensors"][s][i] for s in C.SENSORS} for i in range(C.WINDOW)]
     assert client.post("/api/predict", json={"readings": rows}).status_code == 401
     assert client.post("/api/predict", json={"readings": rows}, headers={"X-API-Key": "secret"}).status_code == 200
+
+
+def test_all_read_endpoints_return_valid_json(client):
+    """Regression: NaN correlations of constant sensors once made /api/sensors fail JSON encoding."""
+    for path in ("/api/sensors", "/api/model", "/api/research", "/api/explain", "/api/schema", "/api/fleet"):
+        r = client.get(path)
+        assert r.status_code == 200, path
+    assert len(client.get("/api/sensors").json()) == 21

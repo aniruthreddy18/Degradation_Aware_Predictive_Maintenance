@@ -1,0 +1,1 @@
+{"interval": {"k": 3.7679, "level": 0.95, "method": "MC dropout (50 passes), k calibrated on validation engines"}, "model_id": "lstm_da_s4"}

@@ -84,8 +84,8 @@ def main(artifact_dir: Path = C.ARTIFACT_DIR):
     x_va, y_va, _ = make_windows(df_va, scaler)
 
     # --- calibrate the MC-dropout interval on validation engines ----------------------------------
-    m, s = P.mc(x_va, seed=1)
-    z = np.abs(y_va - m) / np.maximum(s, 0.5)
+    _, s = P.mc(x_va, seed=1)
+    z = np.abs(y_va - P.point(x_va)) / np.maximum(s, 0.5)   # interval is centred on the deterministic prediction
     k = float(np.quantile(z, LEVEL))
     print(f"interval multiplier k={k:.2f} (raw 1.96 -> calibrated {k:.2f})")
     meta = {"interval": {"k": round(k, 4), "level": LEVEL, "method": "MC dropout (50 passes), k calibrated on validation engines"},
@@ -95,10 +95,10 @@ def main(artifact_dir: Path = C.ARTIFACT_DIR):
 
     # --- test-set evaluation of the served model -------------------------------------------------
     x_te, te_units = last_windows(test_df, scaler)
-    m_te, s_te = P.mc(x_te, seed=2)
-    lo_te, hi_te = P.interval(m_te, s_te)
+    _, s_te = P.mc(x_te, seed=2)
     y_cap = np.minimum(rul_end, C.RUL_CAP)
     p_pt = P.point(x_te)
+    lo_te, hi_te = P.interval(p_pt, s_te)
     served = {"capped": evaluate(p_pt, y_cap), "uncapped": evaluate(p_pt, rul_end),
               "interval_coverage_test": round(float(np.mean((y_cap >= lo_te) & (y_cap <= hi_te))), 3),
               "interval_mean_width": round(float(np.mean(hi_te - lo_te)), 2)}
@@ -112,7 +112,8 @@ def main(artifact_dir: Path = C.ARTIFACT_DIR):
         from .pipeline import _unit_windows
         wins = _unit_windows(raw, C.WINDOW)
         x = scaler.transform_windows(wins)
-        mm, ss = P.mc(x, seed=3)
+        _, ss = P.mc(x, seed=3)
+        mm = P.point(x)
         lo, hi = P.interval(mm, ss)
         cyc = np.arange(C.WINDOW, T + 1)
         true_c = np.minimum(rul_end[unit - 1] + (T - cyc), C.RUL_CAP)
@@ -133,7 +134,7 @@ def main(artifact_dir: Path = C.ARTIFACT_DIR):
     for sname in C.ALL_SENSORS:
         v = train_df[sname]
         kept = sname in C.SENSORS
-        corr = float(train_df[[sname, "rul"]].assign(rul=np.minimum(train_df["rul"], C.RUL_CAP)).corr(method="spearman").iloc[0, 1]) if v.std() > 0 else 0.0
+        corr = float(train_df[[sname, "rul"]].assign(rul=np.minimum(train_df["rul"], C.RUL_CAP)).corr(method="spearman").iloc[0, 1]) if v.std() > 1e-6 else 0.0
         sym, desc, unit = C.SENSOR_INFO[sname]
         rows.append({"key": sname, "symbol": sym, "name": desc, "unit": unit, "kept": kept, "std": round(float(v.std()), 5),
                      "mean": round(float(v.mean()), 4), "corrRul": round(corr, 3),
@@ -163,7 +164,7 @@ def main(artifact_dir: Path = C.ARTIFACT_DIR):
     xt = torch.from_numpy(x_te.copy()).requires_grad_(True)
     P.model.eval()
     P.model(xt).sum().backward()
-    sal = (xt.grad * xt).abs().mean(dim=(0, 2)).numpy()
+    sal = (xt.grad * xt).abs().mean(dim=(0, 2)).detach().numpy()
     sal = sal / sal.sum()
     explain = {"method": "permutation importance on validation engines (RMSE increase in cycles, 5 repeats); "
                          "input×gradient saliency over the 30-cycle window on the 100 test engines",

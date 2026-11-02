@@ -67,7 +67,8 @@ class Predictor:
         """raw: (T>=30, 14) unscaled sensor history in C.SENSORS order. Uses the last 30 cycles."""
         win = raw[-C.WINDOW :][None]
         x = self.scaler.transform_windows(win)
-        mean, std = self.mc(x, passes)
+        _, std = self.mc(x, passes)
+        mean = self.point(x)                      # headline RUL = deterministic prediction
         lo, hi = self.interval(mean, std)
         rul = float(mean[0])
         risk = C.risk_of(rul)

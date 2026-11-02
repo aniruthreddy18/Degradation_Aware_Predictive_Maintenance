@@ -71,11 +71,11 @@ function ResearchBody({ r }: { r: Research }) {
             <thead><tr className="eyebrow border-b text-left"><th className="pb-2">Model</th><th className="pb-2 text-right">RMSE</th><th className="pb-2 text-right">MAE</th><th className="pb-2 text-right">Score</th></tr></thead>
             <tbody>{bench.map((b) => (
               <tr key={b.variant} className={`border-b last:border-0 ${b.variant === "lstm_da" ? "bg-accent font-semibold" : ""}`}>
-                <td className="py-2 pr-2">{b.name}</td><td className="num py-2 text-right">{pm(b.rmse, b.rmse_std)}</td><td className="num py-2 text-right">{b.mae.toFixed(2)}</td><td className="num py-2 text-right">{Math.round(b.score)}</td>
+                <td className="py-2 pr-2">{b.name}</td><td className="num whitespace-nowrap py-2 pl-3 text-right">{pm(b.rmse, b.rmse_std)}</td><td className="num py-2 pl-3 text-right">{b.mae.toFixed(2)}</td><td className="num py-2 pl-3 text-right">{Math.round(b.score)}</td>
               </tr>))}
             </tbody>
           </table>
-          <p className="mt-3 text-xs text-muted-foreground">{bench[0]?.n_seeds} seeds per model · {p.n_runs} training runs in total.</p>
+          <p className="mt-3 text-xs text-muted-foreground">{Math.min(...bench.map((b) => b.n_seeds))}–{Math.max(...bench.map((b) => b.n_seeds))} seeds per model (the baseline and proposed LSTM get the most) · {p.n_runs} training runs in total.</p>
         </Panel>
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -87,7 +87,7 @@ function ResearchBody({ r }: { r: Research }) {
               return (
                 <tr key={a.variant} className={`border-b last:border-0 ${a.variant === "lstm_da" ? "bg-accent font-semibold" : ""}`}>
                   <td className="py-2 pr-2">{LABEL[a.variant]}</td>
-                  <td className="num py-2 text-right">{pm(a.rmse, a.rmse_std)}</td>
+                  <td className="num whitespace-nowrap py-2 pl-3 text-right">{pm(a.rmse, a.rmse_std)}</td>
                   <td className="num py-2 text-right">{Math.round(a.score)}</td>
                   <td className={`num py-2 text-right ${a.variant === "lstm_da" ? "" : d > 0 ? "text-critical" : "text-healthy"}`}>{a.variant === "lstm_da" ? "—" : `${d > 0 ? "+" : ""}${d.toFixed(2)}`}</td>
                 </tr>
