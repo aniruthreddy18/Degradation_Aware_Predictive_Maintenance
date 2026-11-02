@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { PageTitle, Panel, RiskBadge } from "@/components/pm/ui";
-import { engines, maintenanceAction, type Risk } from "@/lib/pm-data";
+import { PageTitle, Panel, QueryBoundary, RiskBadge } from "@/components/pm/ui";
+import { useFleet, type Engine } from "@/lib/api";
+import { maintenanceAction, type Risk } from "@/lib/pm-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/engine-health")({
@@ -19,13 +20,22 @@ export const Route = createFileRoute("/engine-health")({
 const filters = ["All", "Healthy", "Warning", "Critical"] as const;
 
 function EngineHealth() {
+  const q = useFleet();
+  return (
+    <>
+      <PageTitle eyebrow="Fleet monitoring" title="Engine Health" desc="Health index is the model's predicted RUL normalised to the 125-cycle degradation cap." />
+      <QueryBoundary query={q}>{(d) => <EngineGrid engines={d.engines} />}</QueryBoundary>
+    </>
+  );
+}
+
+function EngineGrid({ engines }: { engines: Engine[] }) {
   const [f, setF] = useState<(typeof filters)[number]>("All");
-  const list = useMemo(() => engines.filter((e) => f === "All" || e.risk === (f as Risk)), [f]);
+  const list = useMemo(() => engines.filter((e) => f === "All" || e.risk === (f as Risk)), [engines, f]);
   const barTone = (r: Risk) => (r === "Healthy" ? "bg-healthy" : r === "Warning" ? "bg-warning" : "bg-critical");
 
   return (
     <>
-      <PageTitle eyebrow="Fleet monitoring" title="Engine Health" desc="Health index is derived from predicted RUL normalised to the 125-cycle degradation cap." />
       <div className="mb-4 flex gap-1 rounded-md border bg-card p-1 w-fit">
         {filters.map((x) => (
           <button key={x} onClick={() => setF(x)} className={cn("rounded px-3 py-1.5 text-xs font-medium", f === x ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{x}</button>
@@ -40,12 +50,12 @@ function EngineHealth() {
             </div>
             <div className="mt-3 flex items-baseline justify-between">
               <span className="eyebrow">Health index</span>
-              <span className="num text-lg font-semibold">{e.health}%</span>
+              <span className="num text-lg font-semibold">{Math.round(e.health)}%</span>
             </div>
             <div className="mt-1 h-1.5 rounded-full bg-muted"><div className={cn("h-full rounded-full", barTone(e.risk))} style={{ width: `${e.health}%` }} /></div>
             <dl className="mt-3 grid grid-cols-2 gap-y-1 text-xs">
               <dt className="text-muted-foreground">Cycles run</dt><dd className="num text-right">{e.cycles}</dd>
-              <dt className="text-muted-foreground">Predicted RUL</dt><dd className="num text-right font-medium">{e.predRul}</dd>
+              <dt className="text-muted-foreground">Predicted RUL</dt><dd className="num text-right font-medium">{Math.round(e.predRul)} <span className="font-normal text-muted-foreground">({Math.round(e.lower)}–{Math.round(e.upper)})</span></dd>
             </dl>
             <p className="mt-3 border-t pt-2 text-xs text-muted-foreground">{maintenanceAction(e.risk)}</p>
           </Panel>

@@ -30,3 +30,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python / backend
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/artifacts/runs/*.pt

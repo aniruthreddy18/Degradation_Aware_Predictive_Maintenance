@@ -1,0 +1,5 @@
+# Runtime only (inference + API). CPU-only torch is installed separately in the Dockerfile.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+numpy>=1.26
+pydantic>=2.6

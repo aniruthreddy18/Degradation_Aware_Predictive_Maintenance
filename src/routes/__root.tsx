@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/pm/AppSidebar";
+import { useHealth } from "@/lib/api";
 
 function NotFoundComponent() {
   return (
@@ -87,6 +88,19 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function ModelStatus() {
+  const h = useHealth();
+  const ok = h.data?.status === "ok";
+  const label = h.isPending ? "Connecting…" : ok ? "Loaded" : "API offline";
+  return (
+    <div className="hidden items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-xs sm:flex" role="status">
+      <span className={`size-2 rounded-full ${h.isPending ? "bg-warning" : ok ? "bg-healthy" : "bg-critical"}`} />
+      <span className="text-muted-foreground">Model Status:</span>
+      <span className="font-medium text-foreground" title={h.data?.model}>{label}</span>
+    </div>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
@@ -101,11 +115,7 @@ function RootComponent() {
                 <div className="truncate font-serif text-base font-semibold text-foreground">Predictive Maintenance Intelligence Platform</div>
                 <div className="truncate text-xs text-muted-foreground">NASA C-MAPSS FD001 | Degradation-Aware Deep Learning</div>
               </div>
-              <div className="hidden items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-xs sm:flex">
-                <span className="size-2 rounded-full bg-healthy" />
-                <span className="text-muted-foreground">Model Status:</span>
-                <span className="font-medium text-foreground">Loaded</span>
-              </div>
+              <ModelStatus />
             </header>
             <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 md:p-8">
               <Outlet />

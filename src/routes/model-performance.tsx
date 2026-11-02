@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Kpi, PageTitle, Panel, axis, grid, tooltipStyle } from "@/components/pm/ui";
-import { errorHistogram, metrics, trainingCurve } from "@/lib/pm-data";
+import { Kpi, PageTitle, Panel, QueryBoundary, axis, grid, tooltipStyle } from "@/components/pm/ui";
+import { useModel, type ModelInfo } from "@/lib/api";
 
 export const Route = createFileRoute("/model-performance")({
   head: () => ({
@@ -16,38 +16,49 @@ export const Route = createFileRoute("/model-performance")({
 });
 
 function Perf() {
+  const q = useModel();
   return (
     <>
-      <PageTitle eyebrow="Evaluation" title="Model Performance" desc="Metrics computed on the 100-engine FD001 test set using the last observed cycle of each trajectory." />
+      <PageTitle eyebrow="Evaluation" title="Model Performance" desc="Metrics of the served model on the official 100-engine FD001 test set, scored at the last observed cycle of each engine against RUL_FD001 (true RUL capped at 125)." />
+      <QueryBoundary query={q}>{(m) => <PerfBody m={m} />}</QueryBoundary>
+    </>
+  );
+}
+
+function PerfBody({ m }: { m: ModelInfo }) {
+  const k = m.served.metrics;
+  const best = m.curve.reduce((a, b) => (b.val < a.val ? b : a));
+  return (
+    <>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Kpi label="RMSE" value={metrics.rmse} unit="cycles" />
-        <Kpi label="MAE" value={metrics.mae} unit="cycles" />
-        <Kpi label="NASA Score" value={metrics.score} note="Asymmetric; penalises late predictions" />
-        <Kpi label="R²" value={metrics.r2} />
+        <Kpi label="RMSE" value={k.rmse.toFixed(2)} unit="cycles" note={`uncapped truth: ${m.served.metrics_uncapped.rmse.toFixed(2)}`} />
+        <Kpi label="MAE" value={k.mae.toFixed(2)} unit="cycles" />
+        <Kpi label="NASA Score" value={Math.round(k.score)} note="Asymmetric; penalises late predictions" />
+        <Kpi label="R²" value={k.r2.toFixed(3)} note={`95% interval covers ${(m.served.coverage * 100).toFixed(0)}% of test engines`} />
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Panel title="Training convergence" sub="RMSE loss per epoch · early stopping at epoch 60">
+        <Panel title="Training convergence" sub={`RMSE (cycles) per epoch · best validation epoch ${best.epoch} of ${m.curve.length}`}>
           <div className="h-72">
             <ResponsiveContainer>
-              <LineChart data={trainingCurve}>
+              <LineChart data={m.curve}>
                 <CartesianGrid {...grid} />
                 <XAxis dataKey="epoch" {...axis} />
                 <YAxis {...axis} />
                 <Tooltip {...tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line dataKey="train" name="Train" stroke="var(--chart-1)" dot={false} strokeWidth={2} />
-                <Line dataKey="val" name="Validation" stroke="var(--chart-4)" dot={false} strokeWidth={2} />
+                <Line dataKey="val" name="Validation (held-out engines)" stroke="var(--chart-4)" dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </Panel>
-        <Panel title="Prediction error distribution" sub="Predicted − true RUL (cycles)">
+        <Panel title="Prediction error distribution" sub="Predicted − true RUL (cycles), 100 test engines">
           <div className="h-72">
             <ResponsiveContainer>
-              <BarChart data={errorHistogram}>
+              <BarChart data={m.errorHistogram}>
                 <CartesianGrid {...grid} />
                 <XAxis dataKey="bin" {...axis} />
-                <YAxis {...axis} />
+                <YAxis {...axis} allowDecimals={false} />
                 <Tooltip {...tooltipStyle} cursor={{ fill: "var(--muted)" }} />
                 <Bar dataKey="count" fill="var(--chart-2)" radius={[3, 3, 0, 0]} />
               </BarChart>
@@ -55,10 +66,10 @@ function Perf() {
           </div>
         </Panel>
       </div>
-      <Panel title="Model configuration" className="mt-6">
-        <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          {[["Architecture", "2× LSTM (64, 32) + attention"], ["Window length", "30 cycles"], ["Features", "14 sensors + 3 settings"], ["RUL cap", "125 cycles"], ["Optimizer", "Adam, lr 1e-3"], ["Batch size", "256"], ["Dropout", "0.2"], ["Loss", "Degradation-weighted MSE"]].map(([k, v]) => (
-            <div key={k} className="flex justify-between border-b py-1.5"><dt className="text-muted-foreground">{k}</dt><dd className="num text-right text-xs font-medium">{v}</dd></div>
+      <Panel title="Model configuration" sub={`Served checkpoint ${m.served.id} · chosen by validation RMSE ${m.served.val_rmse.toFixed(2)}, not by test score`} className="mt-6">
+        <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(m.config).map(([k2, v]) => (
+            <div key={k2} className="flex justify-between gap-4 border-b py-1.5"><dt className="capitalize text-muted-foreground">{k2.replace(/_/g, " ")}</dt><dd className="num text-right text-xs font-medium">{String(v)}</dd></div>
           ))}
         </dl>
       </Panel>
