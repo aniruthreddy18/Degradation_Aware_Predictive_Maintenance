@@ -1,0 +1,18 @@
+# One command deployment:  docker compose up --build   ->  http://localhost:8080
+services:
+  backend:
+    build: ./backend
+    environment:
+      PM_CORS_ORIGINS: "${PM_CORS_ORIGINS:-http://localhost:8080}"
+      PM_API_KEY: "${PM_API_KEY:-}"          # set to require X-API-Key on POST /api/predict
+    restart: unless-stopped
+  frontend:
+    build: .
+    depends_on: [backend]
+    restart: unless-stopped
+  gateway:
+    image: nginx:1.27-alpine
+    volumes: ["./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
+    ports: ["8080:80"]
+    depends_on: [backend, frontend]
+    restart: unless-stopped

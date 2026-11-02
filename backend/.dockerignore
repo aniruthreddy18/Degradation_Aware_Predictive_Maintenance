@@ -1,0 +1,6 @@
+data
+artifacts/runs
+tests
+scripts
+__pycache__
+.pytest_cache

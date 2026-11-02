@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowRight } from "lucide-react";
-import { Kpi, PageTitle, Panel, RiskBadge, axis, grid, tooltipStyle } from "@/components/pm/ui";
-import { engines, fleet, metrics, riskColor, maintenanceAction } from "@/lib/pm-data";
+import { Kpi, PageTitle, Panel, QueryBoundary, RiskBadge, axis, grid, tooltipStyle } from "@/components/pm/ui";
+import { useFleet, type Fleet } from "@/lib/api";
+import { riskColor, maintenanceAction } from "@/lib/pm-data";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -19,6 +20,18 @@ export const Route = createFileRoute("/")({
 const pipeline = ["Data", "Sensor Degradation", "Deep Learning", "RUL Prediction", "Risk", "Maintenance Decision"];
 
 function Overview() {
+  const q = useFleet();
+  return (
+    <>
+      <PageTitle eyebrow="Executive summary" title="Fleet Overview" desc="Current state of the FD001 test fleet as estimated by the degradation-aware LSTM, served live from the model API." />
+      <QueryBoundary query={q}>{(d) => <OverviewBody d={d} />}</QueryBoundary>
+    </>
+  );
+}
+
+function OverviewBody({ d }: { d: Fleet }) {
+  const { engines, summary, metrics } = d;
+  const fleet = { total: summary.total, healthy: summary.healthy, warning: summary.warning, critical: summary.critical, avgRul: summary.avgRul };
   const riskData = [
     { name: "Healthy", value: fleet.healthy },
     { name: "Warning", value: fleet.warning },
@@ -32,8 +45,6 @@ function Overview() {
 
   return (
     <>
-      <PageTitle eyebrow="Executive summary" title="Fleet Overview" desc="Current state of the FD001 test fleet as estimated by the degradation-aware LSTM model." />
-
       <div className="panel mb-6 flex flex-wrap items-center gap-2 p-3">
         {pipeline.map((p, i) => (
           <div key={p} className="flex items-center gap-2">
@@ -48,8 +59,8 @@ function Overview() {
         <Kpi label="Healthy" value={fleet.healthy} tone="healthy" note="RUL > 80 cycles" />
         <Kpi label="Warning" value={fleet.warning} tone="warning" note="30 – 80 cycles" />
         <Kpi label="Critical" value={fleet.critical} tone="critical" note="RUL ≤ 30 cycles" />
-        <Kpi label="Avg. Predicted RUL" value={fleet.avgRul} unit="cycles" />
-        <Kpi label="Test RMSE" value={metrics.rmse} unit="cycles" note={`MAE ${metrics.mae}`} />
+        <Kpi label="Avg. Predicted RUL" value={Math.round(fleet.avgRul)} unit="cycles" />
+        <Kpi label="Test RMSE" value={metrics.rmse.toFixed(2)} unit="cycles" note={`MAE ${metrics.mae.toFixed(2)}`} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -86,13 +97,13 @@ function Overview() {
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
         <Panel title="Maintenance priority queue" sub="Lowest predicted RUL first" className="lg:col-span-3" action={<Link to="/engine-health" className="text-xs font-medium text-primary hover:underline">All engines →</Link>}>
           <table className="w-full text-sm">
-            <thead><tr className="border-b text-left eyebrow"><th className="pb-2">Engine</th><th className="pb-2">Cycles</th><th className="pb-2">Pred. RUL</th><th className="pb-2">Risk</th><th className="hidden pb-2 md:table-cell">Action</th></tr></thead>
+            <thead><tr className="border-b text-left eyebrow"><th className="pb-2">Engine</th><th className="pb-2">Cycles</th><th className="pb-2">Pred. RUL (95%)</th><th className="pb-2">Risk</th><th className="hidden pb-2 md:table-cell">Action</th></tr></thead>
             <tbody>
               {priority.map((e) => (
                 <tr key={e.id} className="border-b last:border-0">
                   <td className="num py-2 font-medium">#{String(e.id).padStart(3, "0")}</td>
                   <td className="num py-2 text-muted-foreground">{e.cycles}</td>
-                  <td className="num py-2 font-semibold">{e.predRul}</td>
+                  <td className="num py-2 font-semibold">{Math.round(e.predRul)} <span className="text-xs font-normal text-muted-foreground">({Math.round(e.lower)}–{Math.round(e.upper)})</span></td>
                   <td className="py-2"><RiskBadge risk={e.risk} /></td>
                   <td className="hidden py-2 text-xs text-muted-foreground md:table-cell">{maintenanceAction(e.risk)}</td>
                 </tr>
@@ -100,7 +111,7 @@ function Overview() {
             </tbody>
           </table>
         </Panel>
-        <Panel title="Predicted vs. true RUL" sub="Each point is one test engine" className="lg:col-span-2">
+        <Panel title="Predicted vs. true RUL" sub="Each point is one test engine · true RUL capped at 125" className="lg:col-span-2">
           <div className="h-72">
             <ResponsiveContainer>
               <ScatterChart>
@@ -108,7 +119,7 @@ function Overview() {
                 <XAxis dataKey="trueRul" name="True" type="number" {...axis} />
                 <YAxis dataKey="predRul" name="Predicted" type="number" {...axis} />
                 <Tooltip {...tooltipStyle} />
-                <Scatter data={engines} fill="var(--chart-1)" fillOpacity={0.7} />
+                <Scatter data={engines.map((e) => ({ trueRul: e.trueRulCapped, predRul: e.predRul }))} fill="var(--chart-1)" fillOpacity={0.7} />
               </ScatterChart>
             </ResponsiveContainer>
           </div>

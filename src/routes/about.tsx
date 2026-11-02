@@ -22,8 +22,8 @@ function About() {
           <p className="text-sm leading-relaxed text-muted-foreground">
             Unplanned engine failures are costly and dangerous, while fixed-interval maintenance wastes useful component life.
             This project estimates each engine's Remaining Useful Life from multivariate sensor streams so maintenance can be
-            scheduled just before failure. A degradation-aware LSTM with temporal attention learns how sensor signatures evolve as
-            the high-pressure compressor wears.
+            scheduled just before failure. A degradation-aware LSTM is fed explicit wear indicators (rolling mean and spread, local trend and rate of change of each sensor) so it can track how sensor signatures evolve as
+            the high-pressure compressor wears. Predictions are served by a FastAPI backend with calibrated uncertainty intervals.
           </p>
         </Panel>
         <Panel title="Dataset">
@@ -36,12 +36,12 @@ function About() {
       </div>
       <Panel title="Methodology" className="mt-6">
         <ol className="grid gap-4 text-sm md:grid-cols-3 lg:grid-cols-6">
-          {[["Data", "Load FD001, drop constant sensors"], ["Preprocess", "Min-max scaling, 30-cycle windows"], ["Label", "Piecewise RUL, capped at 125"], ["Model", "LSTM + attention, weighted loss"], ["Evaluate", "RMSE, MAE, NASA score"], ["Decide", "Risk tiers → maintenance action"]].map(([t, d], i) => (
+          {[["Data", "Load FD001, drop 7 constant sensors"], ["Preprocess", "Train-only scaling, 30-cycle windows"], ["Label", "Piecewise RUL, capped at 125"], ["Model", "LSTM on degradation features"], ["Evaluate", "RMSE, MAE, NASA score"], ["Decide", "Risk tiers → maintenance action"]].map(([t, d], i) => (
             <li key={t} className="rounded-md border bg-background p-3"><div className="num text-xs text-primary">{String(i + 1).padStart(2, "0")}</div><div className="mt-1 font-semibold">{t}</div><p className="mt-1 text-xs text-muted-foreground">{d}</p></li>
           ))}
         </ol>
       </Panel>
-      <p className="mt-6 text-xs text-muted-foreground">Reference: A. Saxena et al., "Damage Propagation Modeling for Aircraft Engine Run-to-Failure Simulation," PHM 2008. Figures shown are demonstration values.</p>
+      <p className="mt-6 text-xs text-muted-foreground">Reference: A. Saxena et al., "Damage Propagation Modeling for Aircraft Engine Run-to-Failure Simulation," PHM 2008.</p>
     </>
   );
 }
